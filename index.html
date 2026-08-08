@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>宝箱</title>
+
+<link rel="stylesheet" href="style.css">
+
+<!-- config.js を先に読むこと（lock.js が CONFIG を参照するため） -->
+<script src="config.js" defer></script>
+<script src="lock.js" defer></script>
+</head>
+<body>
+
+<div class="rays" id="rays"></div>
+
+<!-- ============ 錠前 ============ -->
+<div class="scene" id="lockScene">
+  <div>
+    <div class="lock" id="lock">
+      <div class="shackle"></div>
+      <div class="body">
+        <div class="dials" id="dials"></div>
+        <button class="unlock" id="unlock">開錠</button>
+      </div>
+    </div>
+    <p class="status" id="status" role="status" aria-live="polite"></p>
+    <p class="hint">ダイヤルを上下にドラッグ／▲▼／ホイールで数字を合わせる</p>
+  </div>
+</div>
+
+<!-- ============ メッセージ ============ -->
+<div class="scene" id="messageScene" hidden>
+  <div class="card">
+    <div class="seal">🗝️</div>
+    <h1 id="msgTitle"></h1>
+    <p class="msg" id="msgBody"></p>
+    <p class="sig" id="msgSign"></p>
+  </div>
+</div>
+
+</body>
+</html>
