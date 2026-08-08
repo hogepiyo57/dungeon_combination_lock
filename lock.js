@@ -63,12 +63,17 @@
 
     const dial = { root, win, strip, pos: START };
 
-    /* --- 位置を反映 --- */
-    const itemH = () => strip.firstChild.offsetHeight;
+    /* --- 位置を反映 ---
+       ズレ防止のため、移動量は JS で測らず CSS の calc() に計算させる。
+       --item-h は clamp() の都合で 73.525px のような端数になることがあり、
+       offsetHeight（整数に丸められる）を 200 コマ以上ぶん掛けると
+       1 コマ分を超える誤差になって表示が隣の数字にズレてしまう。 */
+    const itemH = () => strip.firstChild.getBoundingClientRect().height;
 
     dial.render = (animate, dragOffset = 0) => {
       strip.classList.toggle("animate", !!animate);
-      strip.style.transform = `translateY(${(1 - dial.pos) * itemH() + dragOffset}px)`;
+      strip.style.transform =
+        `translateY(calc(var(--item-h) * ${1 - dial.pos} + ${dragOffset}px))`;
       root.setAttribute("aria-valuenow", dial.value());
     };
 
