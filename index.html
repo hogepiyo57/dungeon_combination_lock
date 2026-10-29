@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>宝箱</title>
+<title>ダンジョンの扉</title>
 
 <link rel="stylesheet" href="style.css">
 
@@ -13,28 +13,68 @@
 </head>
 <body>
 
-<div class="rays" id="rays"></div>
+<!-- ぼかした背景（錠前・メッセージ画面の後ろ） -->
+<div class="bg" id="bg"></div>
+<div class="glow" id="glow"></div>
+
+<!-- ============ イントロ：扉全体 → 鍵へズーム → 鍵のアップへクロスディゾルブ ============ -->
+<div class="intro" id="intro" aria-hidden="true">
+  <div class="stage" id="stage">
+    <img class="door" src="assets/door.png" alt="">
+    <span class="torch torch-l"></span>
+    <span class="torch torch-r"></span>
+    <img class="closeup" src="assets/closeup.png" alt="">
+  </div>
+  <button class="skip" id="skip" type="button">スキップ ▶</button>
+</div>
 
 <!-- ============ 錠前 ============ -->
-<div class="scene" id="lockScene">
-  <div>
+<div class="scene" id="lockScene" hidden>
+  <div class="lock-wrap">
     <div class="lock" id="lock">
-      <div class="shackle"></div>
-      <div class="body">
+      <div class="side hex-l"></div>
+      <div class="side hex-r"></div>
+
+      <div class="hasp hasp-top"><i></i><i></i><b></b></div>
+      <div class="hasp hasp-bottom"><i></i><i></i></div>
+
+      <div class="plate">
+        <span class="stud stud-t"></span>
+        <span class="stud stud-b"></span>
         <div class="dials" id="dials"></div>
-        <button class="unlock" id="unlock">開錠</button>
       </div>
     </div>
+
+    <button class="unlock" id="unlock" type="button">開錠</button>
     <p class="status" id="status" role="status" aria-live="polite"></p>
-    <p class="hint">ダイヤルを上下にドラッグ／▲▼／ホイールで数字を合わせる</p>
+    <p class="hint">ダイヤルを上下にドラッグ／▲▼／ホイール／キー入力で文字を合わせる</p>
   </div>
 </div>
 
 <!-- ============ メッセージ ============ -->
 <div class="scene" id="messageScene" hidden>
+  <div class="godrays" aria-hidden="true"></div>
+  <div class="embers" id="embers" aria-hidden="true"></div>
+
   <div class="card">
-    <div class="seal">🗝️</div>
+    <span class="corner c-tl"></span><span class="corner c-tr"></span>
+    <span class="corner c-bl"></span><span class="corner c-br"></span>
+
+    <svg class="key" viewBox="0 0 64 64" aria-hidden="true">
+      <defs>
+        <linearGradient id="brass" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#fbe58a"/>
+          <stop offset=".5" stop-color="#d4a72c"/>
+          <stop offset="1" stop-color="#8a6414"/>
+        </linearGradient>
+      </defs>
+      <circle cx="20" cy="20" r="13" fill="none" stroke="url(#brass)" stroke-width="7"/>
+      <circle cx="20" cy="20" r="4" fill="#3a2606"/>
+      <path d="M29 29 L54 54 M44 44 L51 37 M50 50 L56 44" fill="none" stroke="url(#brass)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+
     <h1 id="msgTitle"></h1>
+    <div class="divider"><span></span></div>
     <p class="msg" id="msgBody"></p>
     <p class="sig" id="msgSign"></p>
   </div>

@@ -1,23 +1,25 @@
 /* ============================================================
-   宝箱 — 4桁ダイヤル錠
+   ダンジョンの扉 — 4文字ダイヤル錠
    ============================================================ */
 
 :root {
-  --bg:        #000000;
-  --ray-red:   #d4102f;
-  --ray-yellow:#f2d200;
+  --bg:        #07080a;
 
-  --lock-face: #1d6076;
-  --lock-edge: #16404f;
-  --lock-dark: #123441;
-  --shackle:   #3e4448;
+  --brass-hi:  #fbe58a;
+  --brass:     #d4a72c;
+  --brass-mid: #b88a1e;
+  --brass-lo:  #8a6414;
+  --brass-dk:  #3a2606;
+  --wood:      #4a2a14;
+  --iron:      #3b424a;
+  --flame:     #ffb347;
+  --danger:    #e0452f;
 
-  --strip-hi:  #ffffff;
-  --strip-mid: #d9dcdd;
-  --strip-lo:  #b9bdbf;
-
-  --item-h: clamp(56px, 13vw, 88px);
-  --dial-w: clamp(48px, 11.5vw, 78px);
+  /* ダイヤル1本の幅。錠前の大きさはすべてこの値の倍数で決める */
+  --dial-w: clamp(38px, 11.5vw, 66px);
+  --item-h: calc(var(--dial-w) * .86);
+  --gap:    calc(var(--dial-w) * .1);
+  --arrow-h: calc(var(--dial-w) * .3);
 }
 
 * { box-sizing: border-box; }
@@ -26,8 +28,8 @@ html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
-  color: #fff;
-  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Meiryo", system-ui, sans-serif;
+  color: #f3e9d0;
+  font-family: "Hiragino Mincho ProN", "Yu Mincho", "Georgia", "Times New Roman", serif;
   overscroll-behavior: none;
 }
 
@@ -35,114 +37,304 @@ body {
   min-height: 100svh;
   display: grid;
   place-items: center;
-  overflow-x: hidden;
+  overflow: hidden;
 }
 
-/* ---------- 集中線 ---------- */
-.rays {
+/* ---------- 背景（生成画像をぼかして敷く） ---------- */
+.bg {
   position: fixed;
-  inset: -25%;
+  inset: -6%;
+  z-index: 0;
+  background: url("assets/bg.png") center / cover no-repeat;
+  filter: blur(14px) brightness(.85) saturate(.95);
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+.bg.show { opacity: 1; }
+
+/* 松明のゆらぎ（画面の左右から橙の灯り） */
+.glow {
+  position: fixed;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: repeating-conic-gradient(from 0deg,
-    transparent 0deg 2.1deg,
-    var(--ray-red) 2.1deg 3.3deg,
-    transparent 3.3deg 6.4deg,
-    var(--ray-yellow) 6.4deg 7.2deg,
-    transparent 7.2deg 11.5deg);
-  -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 14%, #000 34%, #000 62%, transparent 78%);
-          mask-image: radial-gradient(circle at 50% 50%, transparent 14%, #000 34%, #000 62%, transparent 78%);
-  opacity: .85;
-  animation: spin 90s linear infinite;
+  opacity: 0;
+  background:
+    radial-gradient(ellipse 45% 55% at 0% 38%,  rgba(255,150,40,.34), transparent 70%),
+    radial-gradient(ellipse 45% 55% at 100% 38%, rgba(255,150,40,.34), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,.72) 100%);
+  transition: opacity 1.4s ease;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.glow.show { opacity: 1; animation: flicker 3.4s ease-in-out infinite; }
 
-.rays.burst { animation: spin 90s linear infinite, burst .7s ease-out; }
-@keyframes burst {
-  0%   { opacity: .85; filter: brightness(1); }
-  30%  { opacity: 1;   filter: brightness(2.4); }
-  100% { opacity: .85; filter: brightness(1); }
+@keyframes flicker {
+  0%, 100% { filter: brightness(1); }
+  18% { filter: brightness(.86); }
+  32% { filter: brightness(1.08); }
+  55% { filter: brightness(.92); }
+  78% { filter: brightness(1.05); }
 }
+
+/* ============================================================
+   イントロ
+   ============================================================ */
+.intro {
+  position: fixed;
+  inset: 0;
+  z-index: 5;
+  background: #000;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 1.3s ease, filter 1.3s ease;
+}
+.intro.out { opacity: 0; filter: blur(14px); pointer-events: none; }
+.intro[hidden] { display: none; }
+
+/* 正方形のステージ。画面を覆う大きさにして中央に置く
+   （画像内の位置を % で指定でき、縦長でも横長でも鍵が画面中央に来る） */
+.stage {
+  --s: max(100vw, 100svh);
+  position: absolute;
+  left: 50%; top: 50%;
+  width: var(--s); height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  opacity: 0;
+  transition: opacity 1s ease;
+}
+.intro.play .stage { opacity: 1; }
+
+.stage img {
+  position: absolute;
+  inset: 0;
+  width: 100%; height: 100%;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 扉全体 → 鍵（扉画像内の錠前中心 50% / 48.6%）へズーム */
+.door {
+  transform-origin: 50% 48.6%;
+  transform: scale(1);
+}
+.intro.zoom .door {
+  transform: scale(2.67);
+  transition: transform 3.6s cubic-bezier(.55, .05, .3, 1);
+}
+
+/* 鍵のアップ。扉の錠前の位置に重ねてクロスディゾルブ */
+.closeup {
+  opacity: 0;
+  transform-origin: 49.3% 44.7%;
+  transform: translate(.7%, 3.9%) scale(1.1);
+}
+.intro.cross .closeup {
+  opacity: 1;
+  transition: opacity 1.5s ease-in-out;
+  animation: push 3s ease-out forwards;
+}
+@keyframes push {
+  from { transform: translate(.7%, 3.9%) scale(1.1); }
+  to   { transform: translate(.7%, 3.9%) scale(1.17); }
+}
+
+/* 松明の炎のゆらぎ（扉画像上の左右の炎） */
+.torch {
+  position: absolute;
+  top: 24%;
+  width: 22%; height: 26%;
+  margin-left: -11%;
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(255,160,50,.55) 0%, rgba(255,110,20,.22) 38%, transparent 68%);
+  mix-blend-mode: screen;
+  animation: torch 1.1s ease-in-out infinite;
+}
+.torch-l { left: 9%; }
+.torch-r { left: 91%; animation-delay: -.5s; }
+@keyframes torch {
+  0%, 100% { opacity: .55; transform: scale(1); }
+  25% { opacity: .9;  transform: scale(1.08); }
+  50% { opacity: .6;  transform: scale(.95); }
+  75% { opacity: 1;   transform: scale(1.12); }
+}
+.intro.cross .torch { opacity: 0; transition: opacity .6s; animation: none; }
+
+.skip {
+  position: absolute;
+  right: 16px;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  padding: 8px 16px;
+  border: 1px solid rgba(251,229,138,.45);
+  border-radius: 999px;
+  background: rgba(0,0,0,.45);
+  color: #e9d9a6;
+  font: inherit;
+  font-size: 13px;
+  letter-spacing: .1em;
+  cursor: pointer;
+  opacity: .75;
+}
+.skip:hover { opacity: 1; background: rgba(0,0,0,.65); }
 
 /* ---------- シーン ---------- */
 .scene {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   width: 100%;
+  height: 100svh;
   padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
   display: grid;
   place-items: center;
+  overflow: auto;
 }
 .scene[hidden] { display: none; }
 
-/* ---------- 錠前 ---------- */
-.lock { position: relative; }
-
-.shackle {
-  width: clamp(96px, 24vw, 150px);
-  height: clamp(70px, 17vw, 110px);
-  margin: 0 auto -10px;
-  border: clamp(16px, 4vw, 26px) solid var(--shackle);
-  border-bottom: none;
-  border-radius: clamp(48px, 12vw, 75px) clamp(48px, 12vw, 75px) 0 0;
-  transform-origin: 88% 100%;
-  transition: transform .55s cubic-bezier(.34, 1.56, .64, 1);
+#lockScene { animation: lockIn 1.2s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes lockIn {
+  from { opacity: 0; transform: scale(1.12); }
+  to   { opacity: 1; transform: none; }
 }
-.lock.open .shackle { transform: translateY(-26px) rotate(28deg); }
 
-.body {
+.lock-wrap { display: grid; justify-items: center; }
+
+/* ============================================================
+   錠前（真鍮の円盤＋六角プレート＋掛け金）
+   ============================================================ */
+.lock {
   position: relative;
-  background: var(--lock-face);
-  border: 4px solid var(--lock-edge);
-  border-radius: 26px;
-  padding: clamp(18px, 4vw, 28px) clamp(14px, 3.5vw, 26px) clamp(76px, 17vw, 104px);
-  box-shadow: 0 0 0 2px #000, 0 18px 50px rgba(0,0,0,.75);
+  width: calc(var(--dial-w) * 6.4);
+  padding: calc(var(--dial-w) * .85) 0;
+  display: grid;
+  place-items: center;
 }
 
-/* 四隅のブラケット */
-.body::before, .body::after {
+/* 真鍮の質感（共通） */
+.plate, .side, .hasp i, .hasp b, .unlock {
+  background:
+    linear-gradient(135deg, var(--brass-hi) 0%, var(--brass) 34%, var(--brass-mid) 62%, var(--brass-lo) 100%);
+}
+
+.plate {
+  position: relative;
+  z-index: 2;
+  width: calc(var(--dial-w) * 6.1);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: calc(var(--dial-w) * .07) solid var(--brass-lo);
+  box-shadow:
+    inset 0 0 0 calc(var(--dial-w) * .06) rgba(251,229,138,.55),
+    inset 0 calc(var(--dial-w) * -.18) calc(var(--dial-w) * .3) rgba(58,38,6,.55),
+    0 calc(var(--dial-w) * .25) calc(var(--dial-w) * .6) rgba(0,0,0,.8);
+}
+
+.stud {
+  position: absolute;
+  left: 50%;
+  width: calc(var(--dial-w) * .2);
+  height: calc(var(--dial-w) * .2);
+  margin-left: calc(var(--dial-w) * -.1);
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--brass-hi), var(--brass-lo));
+  box-shadow: 0 1px 2px rgba(0,0,0,.6);
+}
+.stud-t { top: calc(var(--dial-w) * .28); }
+.stud-b { bottom: calc(var(--dial-w) * .28); }
+
+/* 左右の六角プレート */
+.side {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  width: calc(var(--dial-w) * 1.6);
+  height: calc(var(--dial-w) * 1.9);
+  margin-top: calc(var(--dial-w) * -.95);
+  filter: drop-shadow(0 calc(var(--dial-w) * .12) calc(var(--dial-w) * .2) rgba(0,0,0,.7));
+}
+.side::after {
   content: "";
   position: absolute;
-  width: 34px; height: 34px;
-  border: 7px solid var(--lock-dark);
+  top: 50%; left: 50%;
+  width: calc(var(--dial-w) * .46);
+  height: calc(var(--dial-w) * .46);
+  margin: calc(var(--dial-w) * -.23) 0 0 calc(var(--dial-w) * -.23);
+  transform: rotate(45deg);
+  background: linear-gradient(135deg, var(--brass-hi), var(--brass-lo));
+  box-shadow: inset 0 0 0 2px rgba(58,38,6,.5);
 }
-.body::before { top: 10px;    left: 10px;  border-right: none; border-bottom: none; border-radius: 12px 0 0 0; }
-.body::after  { bottom: 10px; right: 10px; border-left: none;  border-top: none;    border-radius: 0 0 12px 0; }
+.hex-l { left: calc(var(--dial-w) * -.95); clip-path: polygon(0 50%, 28% 0, 100% 0, 100% 100%, 28% 100%); }
+.hex-r { right: calc(var(--dial-w) * -.95); clip-path: polygon(100% 50%, 72% 0, 0 0, 0 100%, 72% 100%); }
+
+/* 掛け金（上下の金具）。上のクロスバーは開錠で持ち上がる */
+.hasp {
+  position: absolute;
+  left: 50%;
+  z-index: 1;
+  width: calc(var(--dial-w) * 1.3);
+  margin-left: calc(var(--dial-w) * -.65);
+  display: flex;
+  justify-content: space-between;
+}
+.hasp i {
+  display: block;
+  width: calc(var(--dial-w) * .42);
+  height: calc(var(--dial-w) * 1.1);
+  border-radius: 3px;
+  box-shadow: inset 0 0 0 2px rgba(58,38,6,.4), 0 2px 6px rgba(0,0,0,.6);
+}
+.hasp-top    { top: calc(var(--dial-w) * -.1); }
+.hasp-bottom { bottom: calc(var(--dial-w) * -.1); }
+.hasp b {
+  position: absolute;
+  left: 50%; top: calc(var(--dial-w) * .42);
+  width: calc(var(--dial-w) * .62);
+  height: calc(var(--dial-w) * .26);
+  margin-left: calc(var(--dial-w) * -.31);
+  border-radius: 3px;
+  transform-origin: 100% 100%;
+  transition: transform .6s cubic-bezier(.34, 1.56, .64, 1);
+}
+.lock.open .hasp-top b { transform: translateY(calc(var(--dial-w) * -.55)) rotate(-26deg); }
+.lock.open .plate {
+  box-shadow:
+    inset 0 0 0 calc(var(--dial-w) * .06) rgba(251,229,138,.8),
+    0 0 calc(var(--dial-w) * 1.2) rgba(255,205,90,.85),
+    0 calc(var(--dial-w) * .25) calc(var(--dial-w) * .6) rgba(0,0,0,.8);
+}
 
 /* ---------- ダイヤル ---------- */
 .dials {
   display: flex;
-  gap: clamp(5px, 1.4vw, 10px);
+  gap: var(--gap);
   justify-content: center;
+  padding: calc(var(--dial-w) * .12) calc(var(--dial-w) * .14);
+  background: #130d03;
+  border-radius: calc(var(--dial-w) * .14);
+  box-shadow: inset 0 3px 10px rgba(0,0,0,.9), 0 0 0 calc(var(--dial-w) * .05) var(--brass-lo);
 }
 
 .dial {
   position: relative;
   width: var(--dial-w);
-  background: var(--lock-dark);
-  border-radius: 6px;
-  padding: 4px;
   touch-action: none;
   outline: none;
 }
-.dial:focus-visible { box-shadow: 0 0 0 3px var(--ray-yellow); }
+.dial:focus-visible .window { box-shadow: 0 0 0 3px var(--brass-hi); }
 
 .window {
   position: relative;
   height: calc(var(--item-h) * 3);
   overflow: hidden;
-  border-radius: 3px;
-  background: linear-gradient(180deg,
-    var(--strip-lo)  0%,
-    var(--strip-mid) 12%,
-    var(--strip-hi)  50%,
-    var(--strip-mid) 88%,
-    var(--strip-lo) 100%);
+  border-radius: 4px;
+  /* 円筒の真鍮: 左右が暗く中央が明るい */
+  background: linear-gradient(90deg,
+    #6d4d10 0%, #b88a1e 14%, #f0cf62 42%, #fbe58a 52%, #d4a72c 74%, #7a5612 100%);
   cursor: grab;
 }
 .window:active { cursor: grabbing; }
 
-/* 中央のくぼみと陰影 */
+/* 上下へ向かって暗く（円筒が奥へ回り込む陰） */
 .window::before {
   content: "";
   position: absolute;
@@ -150,21 +342,21 @@ body {
   z-index: 2;
   pointer-events: none;
   background:
-    linear-gradient(180deg, rgba(0,0,0,.42) 0%, rgba(0,0,0,0) 20%,
-                            rgba(0,0,0,0) 80%, rgba(0,0,0,.42) 100%),
-    linear-gradient(90deg, rgba(0,0,0,.22) 0%, rgba(255,255,255,.5) 30%,
-                           rgba(255,255,255,.5) 70%, rgba(0,0,0,.22) 100%);
+    linear-gradient(180deg, rgba(20,12,2,.82) 0%, rgba(20,12,2,.18) 28%,
+                            rgba(20,12,2,0) 40%, rgba(20,12,2,0) 60%,
+                            rgba(20,12,2,.18) 72%, rgba(20,12,2,.82) 100%);
 }
+/* 選択行の枠 */
 .window::after {
   content: "";
   position: absolute;
   z-index: 3;
-  left: 6%; right: 6%;
-  top: calc(var(--item-h) - 1px);
-  height: calc(var(--item-h) + 2px);
+  left: 0; right: 0;
+  top: var(--item-h);
+  height: var(--item-h);
   pointer-events: none;
-  border: 3px solid var(--lock-dark);
-  border-radius: 8px;
+  border-top: 1px solid rgba(58,38,6,.55);
+  border-bottom: 1px solid rgba(58,38,6,.55);
 }
 
 .strip { will-change: transform; }
@@ -174,11 +366,11 @@ body {
   height: var(--item-h);
   display: grid;
   place-items: center;
-  font-size: calc(var(--item-h) * .62);
+  font-size: calc(var(--item-h) * .66);
   font-weight: 800;
   line-height: 1;
-  color: var(--lock-dark);
-  font-variant-numeric: tabular-nums;
+  color: var(--brass-dk);
+  text-shadow: 0 1px 0 rgba(255,236,160,.6);
   user-select: none;
   -webkit-user-select: none;
 }
@@ -186,39 +378,41 @@ body {
 .arrow {
   display: block;
   width: 100%;
-  margin: 2px 0;
-  padding: 3px 0;
+  height: var(--arrow-h);
+  margin: calc(var(--dial-w) * .04) 0;
+  padding: 0;
   border: none;
-  border-radius: 4px;
-  background: rgba(255,255,255,.14);
-  color: #cfd6d9;
-  font-size: 11px;
+  border-radius: 3px;
+  background: rgba(251,229,138,.14);
+  color: var(--brass-hi);
+  font-size: calc(var(--dial-w) * .2);
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
-.arrow:hover { background: rgba(255,255,255,.3); color: #fff; }
+.arrow:hover { background: rgba(251,229,138,.35); color: #fff; }
 .arrow:active { transform: scale(.92); }
 
 /* ---------- 開錠ボタン ---------- */
 .unlock {
-  position: absolute;
-  left: 50%;
-  bottom: clamp(10px, 2.5vw, 18px);
-  transform: translateX(-50%) rotate(-2.2deg);
-  padding: clamp(8px, 2vw, 13px) clamp(30px, 8vw, 54px);
-  border: 3px solid #000;
-  background: #fff;
-  color: #000;
-  font-size: clamp(19px, 4.6vw, 28px);
+  margin-top: calc(var(--dial-w) * .3);
+  padding: calc(var(--dial-w) * .2) calc(var(--dial-w) * 1.1);
+  border: 2px solid var(--brass-lo);
+  border-radius: 6px;
+  color: var(--brass-dk);
+  font-family: inherit;
+  font-size: clamp(18px, 4.4vw, 24px);
   font-weight: 900;
-  letter-spacing: .16em;
+  letter-spacing: .4em;
+  text-indent: .4em;
+  text-shadow: 0 1px 0 rgba(255,236,160,.6);
+  box-shadow: inset 0 0 0 2px rgba(251,229,138,.5), 0 6px 16px rgba(0,0,0,.7);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: transform .12s ease, background .12s ease;
+  transition: transform .12s ease, filter .12s ease;
 }
-.unlock:hover { background: var(--ray-yellow); }
-.unlock:active { transform: translateX(-50%) rotate(-2.2deg) scale(.95); }
+.unlock:hover { filter: brightness(1.15); }
+.unlock:active { transform: scale(.95); }
 .unlock:disabled { opacity: .5; cursor: default; }
 
 /* ---------- 判定フィードバック ---------- */
@@ -229,17 +423,21 @@ body {
   30%, 50%, 70% { transform: translateX(-12px); }
   40%, 60% { transform: translateX(12px); }
 }
-
-.lock.wrong .body { border-color: var(--ray-red); background: #6b1220; }
+.lock.wrong .plate {
+  box-shadow:
+    inset 0 0 0 calc(var(--dial-w) * .06) rgba(224,69,47,.8),
+    0 0 calc(var(--dial-w) * .9) rgba(224,69,47,.7),
+    0 calc(var(--dial-w) * .25) calc(var(--dial-w) * .6) rgba(0,0,0,.8);
+}
 
 .status {
   min-height: 1.6em;
-  margin-top: 18px;
+  margin: 16px 0 0;
   text-align: center;
   font-size: clamp(14px, 3.6vw, 17px);
   font-weight: 700;
-  letter-spacing: .1em;
-  color: var(--ray-red);
+  letter-spacing: .12em;
+  color: #ff8b73;
   text-shadow: 0 2px 10px #000;
   opacity: 0;
   transition: opacity .2s;
@@ -247,65 +445,173 @@ body {
 .status.show { opacity: 1; }
 
 .hint {
-  margin-top: 6px;
+  margin: 4px 0 0;
   text-align: center;
   font-size: clamp(11px, 3vw, 13px);
-  color: #7d8488;
+  color: #a99d7e;
   letter-spacing: .06em;
 }
 
-/* ---------- メッセージ画面 ---------- */
-#messageScene { animation: fadeUp .8s ease-out both; }
+/* 開錠の閃光 */
+.flash {
+  position: fixed;
+  inset: 0;
+  z-index: 9;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, #fff6cf, #ffd25a 45%, rgba(255,190,60,0) 80%);
+  opacity: 0;
+}
+.flash.go { animation: flash 1.2s ease-out; }
+@keyframes flash {
+  0%   { opacity: 0; }
+  25%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* ============================================================
+   メッセージ画面
+   ============================================================ */
+#messageScene { animation: fadeUp 1.1s ease-out both; overflow-x: hidden; }
+#messageScene .card { margin: auto; }
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(28px); }
   to   { opacity: 1; transform: none; }
 }
 
+/* 宝の間からさす金色の光 */
+.godrays {
+  position: fixed;
+  left: 50%; top: 50%;
+  width: 220vmax; height: 220vmax;
+  margin: -110vmax 0 0 -110vmax;
+  z-index: -1;
+  pointer-events: none;
+  background: repeating-conic-gradient(from 0deg,
+    rgba(255,214,110,.0) 0deg 7deg,
+    rgba(255,214,110,.14) 7deg 10deg,
+    rgba(255,214,110,0) 10deg 18deg);
+  -webkit-mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+          mask-image: radial-gradient(circle, #000 0%, transparent 62%);
+  animation: spin 120s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 舞い上がる火の粉 */
+.embers { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.embers span {
+  position: absolute;
+  bottom: -12px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #ffe9a0, #ff9a2e 60%, transparent 72%);
+  opacity: 0;
+  animation: ember linear infinite;
+}
+@keyframes ember {
+  0%   { opacity: 0; transform: translate(0, 0) scale(1); }
+  10%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), -105vh) scale(.4); }
+}
+
+/* 羊皮紙の巻物 */
 .card {
+  position: relative;
   max-width: 620px;
   width: 100%;
-  padding: clamp(30px, 8vw, 60px) clamp(24px, 6vw, 52px);
-  background: rgba(8, 10, 12, .93);
-  border: 3px solid var(--ray-yellow);
-  border-radius: 18px;
-  box-shadow: 0 0 60px rgba(242, 210, 0, .28), 0 24px 60px rgba(0,0,0,.8);
+  padding: clamp(32px, 8vw, 58px) clamp(26px, 6vw, 54px);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255,246,208,.55), transparent 60%),
+    linear-gradient(180deg, #ecdcae 0%, #dcc58a 55%, #cfb274 100%);
+  color: #3a2a10;
+  border: 3px solid var(--brass-lo);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 5px #ecdcae,
+    inset 0 0 0 7px var(--brass),
+    inset 0 0 60px rgba(120,80,20,.35),
+    0 0 70px rgba(255,200,80,.35),
+    0 26px 60px rgba(0,0,0,.8);
   text-align: center;
 }
 
-.card .seal {
-  font-size: clamp(40px, 12vw, 66px);
-  line-height: 1;
-  margin-bottom: 18px;
+/* 四隅の飾り */
+.corner {
+  position: absolute;
+  width: 26px; height: 26px;
+  border: 4px solid var(--brass-mid);
+}
+.c-tl { top: 14px;    left: 14px;  border-right: none; border-bottom: none; border-radius: 8px 0 0 0; }
+.c-tr { top: 14px;    right: 14px; border-left: none;  border-bottom: none; border-radius: 0 8px 0 0; }
+.c-bl { bottom: 14px; left: 14px;  border-right: none; border-top: none;    border-radius: 0 0 0 8px; }
+.c-br { bottom: 14px; right: 14px; border-left: none;  border-top: none;    border-radius: 0 0 8px 0; }
+
+.card .key {
+  width: clamp(48px, 13vw, 72px);
+  height: auto;
+  margin-bottom: 10px;
+  filter: drop-shadow(0 3px 4px rgba(58,38,6,.5));
+  animation: keyFloat 3.2s ease-in-out infinite;
+}
+@keyframes keyFloat {
+  0%, 100% { transform: translateY(0) rotate(-6deg); }
+  50%      { transform: translateY(-6px) rotate(6deg); }
 }
 
 .card h1 {
-  margin: 0 0 22px;
-  font-size: clamp(22px, 6vw, 34px);
+  margin: 0;
+  font-size: clamp(24px, 6.4vw, 36px);
   font-weight: 900;
-  letter-spacing: .1em;
-  color: var(--ray-yellow);
+  letter-spacing: .24em;
+  text-indent: .24em;
+  color: #5a3b0a;
+  text-shadow: 0 1px 0 rgba(255,246,208,.8);
+}
+
+/* 区切り線（中央にひし形） */
+.divider {
+  position: relative;
+  height: 14px;
+  margin: 18px auto 24px;
+  max-width: 280px;
+}
+.divider::before {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; top: 50%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--brass-lo) 25%, var(--brass-lo) 75%, transparent);
+}
+.divider span {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 11px; height: 11px;
+  margin: -5.5px 0 0 -5.5px;
+  transform: rotate(45deg);
+  background: var(--brass-mid);
+  box-shadow: 0 0 0 3px #dcc58a;
 }
 
 .card .msg {
   margin: 0;
   font-size: clamp(15px, 4.2vw, 19px);
   line-height: 2.05;
-  letter-spacing: .05em;
+  letter-spacing: .06em;
   white-space: pre-wrap;
   text-align: left;
-  color: #eef1f2;
+  color: #3a2a10;
 }
 
 .card .sig {
-  margin: 30px 0 0;
+  margin: 28px 0 0;
   font-size: clamp(13px, 3.4vw, 15px);
-  letter-spacing: .12em;
-  color: #99a1a5;
+  letter-spacing: .14em;
+  text-align: right;
+  color: #6b5326;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rays { animation: none; }
+  .godrays, .glow.show, .torch, .card .key { animation: none; }
   .strip.animate { transition: none; }
-  #messageScene { animation: none; }
+  #messageScene, #lockScene { animation: none; }
   .lock.shake { animation: none; }
+  .embers { display: none; }
 }
